@@ -9,7 +9,7 @@ import fighting
 
 
 class Economy(object):
-	def __init__(self):
+    def __init__(self):
 		self.base_prices = {"Cactus": .04,
 						"Coal": 2.00,
 						"Cobblestone": .05,
