@@ -7,6 +7,7 @@ import pyimgur
 import economy_graph
 import fighting
 
+
 class Economy(object):
 	def __init__(self):
 		self.base_prices = {"Cactus": .04,
