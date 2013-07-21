@@ -26,7 +26,7 @@ class DataLine(object):
 		self.graphing = True
 		
 	def draw_line(self, surface, x_scale, y_scale, base):
-		scaled_point_list = [(point[0] * x_scale, base - int(point[1] * y_scale)) for point in self.point_list] 
+		scaled_point_list = [(point[0] * x_scale, base - int(point[1] * y_scale/2)) for point in self.point_list] 
 		pygame.draw.lines(surface, self.color, False, scaled_point_list)
 		
 def show_graph(economy):
@@ -177,17 +177,22 @@ def single_commodity_graph(economy, commodity):
 	HALFHEIGHT = SCREENHEIGHT / 2
 	surface = pygame.Surface((SCREENWIDTH, SCREENHEIGHT))
 	data_line = DataLine(commodity, economy.price_history[commodity][1:], economy.price_history[commodity][0])
-	x_scale = 10
+	x_scale = 50
 	while economy.cycle_count * x_scale > SCREENWIDTH:
 		x_scale -= .5
-	max = 0
+	max = economy.base_prices[commodity]
+	min = economy.base_prices[commodity]
 	for point in economy.price_history[commodity][1:]:
 		if point[1] > max:
-			max = point[1]
-	y_scale = SCREENHEIGHT/max
+			max_y = point[1]
+		if point[1] < min:
+			min_y = point[1]
+	y_scale = SCREENHEIGHT/(((max_y - min_y)/2) + economy.base_prices[commodity])
+	print y_scale
+	
 	surface.fill(Color("black"))
-	pygame.draw.line(surface, Color("white"), (economy.price_history[commodity][1][0] * x_scale, economy.price_history[commodity][1][1] * y_scale),
-						(SCREENWIDTH, economy.price_history[commodity][1][1] * y_scale) , 2)
+	pygame.draw.line(surface, Color("white"), (0, SCREENHEIGHT - economy.base_prices[commodity] * y_scale/2),
+						(SCREENWIDTH, SCREENHEIGHT - economy.base_prices[commodity] * y_scale/2) , 2)
 	data_line.draw_line(surface, x_scale, y_scale, SCREENHEIGHT)
 	pygame.image.save(surface, commodity + ".png")
 	

@@ -5,6 +5,7 @@ import pygame
 import praw
 import pyimgur
 import economy_graph
+import fighting
 
 class Economy(object):
 	def __init__(self):
@@ -138,7 +139,8 @@ class Economy(object):
 														"Sapling": 0,
 														"Wheat": 0,
 														"Wheat Seeds": 0}}}
-														
+		self.fights = []
+		
 	def update(self):
 		self.previous_prices = {}
 		for commodity in self.prices:
@@ -183,9 +185,12 @@ def post_prices(economy):
 	
 	bot = praw.Reddit(user_agent = bot_name)
 	bot.login(bot_name, bot_password)
-	text = "Commodity|Price|Change\n:---|---:|---:"
+	text = "Economic Condition: {0}".format(economy.trend)
+	text += "\n\nPrice Volatility: {0}".format(economy.volatility)
+	text += "\n\nCommodity|Price|Change\n:---|---:|---:"
 	for item in economy.prices:
-		text += "\n{0}|{1:.2f}|{2:+.4f}".format(item, economy.prices[item], economy.prices[item] - economy.previous_prices[item])
+		price = "{0:.2f}".format(economy.prices[item]).lstrip("0")
+		text += "\n{0}|{1}|{2:+.4f}".format(item, price, economy.prices[item] - economy.previous_prices[item])
 	text += "\n\nDisplayed prices are rounded to nearest hundredth"
 	bot.submit(sub_name, "QCE Price Update", text)
 		
@@ -245,13 +250,8 @@ def change_citizenship(economy):
 			print "{0} is now a citizen of {1}".format(gamertag, new_district)
 			
 def economy_handler(economy): 
-	print economy.volatility
-	for item in economy.prices:
-		print "{0}:\t\t{1:.2f}\t\t{2}".format(item, economy.prices[item], economy.prices[item] - economy.base_prices[item])
-	post_prices(economy)
 	economy.update()
-	print
-	print economy.trend
+	post_prices(economy)	
 	
 def trade_handler(economy, author, gamertag, transaction_type, commodity, quantity):
 	if economy.citizens[gamertag]["Username"] != str(author):
@@ -321,11 +321,63 @@ def exchange_handler(economy):
 				
 		elif option == "9":
 			return
+
+
 	
+	
+
+
+def display_gladiator_record(economy):
+	gladiator = raw_input("Enter gladiator's gamertag:")
+	print "Wins: {0}  Losses: {1}".format(economy.citizens[gladiator]["Gladiator Wins"], 
+			economy.citizens[gladiator]["Gladiator Losses"])
+	
+def gladiator_menu(economy):
+	print "\n\nGladiator Options"
+	print "1. Set up new fight"
+	print "2. Display Gladiator Record"
+	print "3. Resolve fight"
+	option = raw_input("\nChoose an option:")
+	
+	if option == "1":
+		sub_name = "Quadraria"
+		bot_name = "QuadrarianEconomy"
+		bot_password = ""
+				
+		gladiator1 = raw_input("Enter the first gladiator's gamertag:")
+		gladiator2 = raw_input("Enter the second gladiator's gamertag:")
+		if economy.citizens[gladiator1]["District"] == economy.citizens[gladiator2]["District"]:
+			print "Gladiators are from the same district"
+		else:
+			bot = praw.Reddit(user_agent = bot_name)
+			bot.login(bot_name, bot_password)
+			fight = fighting.GladiatorFight(economy, gladiator1, gladiator2)
+			economy.fights.append(fight)
+			text = "{0} ".format(fight.marquee)
+			text += "\n\nGladiator|W-L|Payout\n:---|:---:|---:"
+			text += "\n{0}|{1}-{2}|{3:.2f}".format(gladiator1, economy.citizens[gladiator1]["Gladiator Wins"],
+										economy.citizens[gladiator1]["Gladiator Losses"], fight.payouts[gladiator1])
+			text += "\n{0}|{1}-{2}|{3:.2f}".format(gladiator2, economy.citizens[gladiator2]["Gladiator Wins"],
+										economy.citizens[gladiator2]["Gladiator Losses"], fight.payouts[gladiator2])
+			bot.submit(sub_name, "Gladiator Match", text)
+	
+	elif option == "2":
+		display_gladiator_record(economy)
+		
+	elif option == "3":
+		fight_map = {}
+		i = 1
+		for fight in economy.fights:
+			fight_map[i] = fight
+			print "{0}. {1}".format(i, fight.marquee)
+			i += 1
+		fight_num = int(raw_input("Choose fight to resolve:"))
+		fight_map[fight_num].resolve_fight(economy)
+		
 def run_bot(economy):
 	sub_name = "Quadraria"
 	bot_name = "QuadrarianEconomy"
-	bot_password = ""
+	bot_password = "" 
 	imgur_client_id = ""
 	
 	bot = praw.Reddit(user_agent = bot_name)
@@ -353,7 +405,7 @@ def run_bot(economy):
 						elif "SELL" in title:
 							reply += trade_handler(economy, author, gamertag, "SELL", commodity, quantity)
 						break
-			if "#ACCT INQ" in submission.title:
+			if "#ACCT INQ" in title:
 				if economy.citizens[gamertag]["Username"] != author:
 					reply += "Username/gamertag authorization failed"
 				else:
@@ -362,10 +414,10 @@ def run_bot(economy):
 					reply += "\n:---|---:"
 					for commodity in economy.prices:
 						reply += "\n{0}|{1}".format(commodity, economy.citizens[gamertag]["Inventory"][commodity])
-			if "#GRAPH" in submission.title:
+			if "#GRAPH" in title:
 				for commodity in economy.prices:
 					if commodity in title:
-						if commodity == "Wheat" and "Wheat Seeds" in submission.title:
+						if commodity == "Wheat" and "Wheat Seeds" in title:
 							pass
 						else:
 							economy_graph.single_commodity_graph(economy, commodity)
@@ -375,6 +427,30 @@ def run_bot(economy):
 							print(uploaded_image.link)
 							reply += "[Graph]({0})".format(uploaded_image.link)
 							os.remove(os.path.join(commodity + ".png"))
+			if "#BET" in title:
+				if economy.citizens[gamertag]["Username"] != author:
+					reply += "Username/gamertag authorization failed"
+				else:	
+					try:
+						bet_amount = int(submission.selftext)
+					except ValueError:
+						economy.checked_ids.append(submission.id)
+						reply += "Post text must be a whole number"
+					if economy.citizens[gamertag]["QCE Account"] < bet_amount:
+						reply += "Insufficient funds"
+					else:
+						fighter = ""
+						for fight in economy.fights:
+							if fight.gladiator1 in title or fight.gladiator2 in title:
+								if fight.gladiator1 in title:
+									fighter = fight.gladiator1
+								else:
+									fighter = fight.gladiator2
+								fight.bets.append([gamertag, fighter, bet_amount]) 
+								economy.citizens[gamertag]["QCE Account"] -= bet_amount
+								reply += "${0} bet placed on {1}".format(bet_amount, fighter) 
+								break
+			
 			economy.checked_ids.append(submission.id)			
 			if len(reply) > 1:
 				submission.add_comment(reply)
@@ -408,14 +484,15 @@ def main():
 		print "Couldn't load economy_save.pickle"
 		economy = Economy()
 	
-	option = int(raw_input("\n1) Update Economy\n2) Draw Graph\n3) Single Commodity Graph\n4) \
-Run Bot\n5) Manage Citizens\n6) Manage Accounts\n7) Building Cost Calculator\n8) Clean Up Sub\n\nEnter option number:"))
+	option = int(raw_input("\n\n\n1) Update Economy\n\n2) Draw Graph\n\n3) Single Commodity Graph\n\n4) \
+Run Bot\n\n5) Manage Citizens\n\n6) Manage Accounts\n\n7) Building Cost Calculator\n\n8) Clean Up Sub\n\n9) Gladiator options\n\nEnter option number:"))
 	if option == 1:
 		economy_handler(economy)
 	elif option == 2:
 		economy_graph.show_graph(economy)
 	elif option == 3:
-		economy_graph.single_commodity_graph(economy)
+		commodity = raw_input("Enter commodity name:")
+		economy_graph.single_commodity_graph(economy, commodity)
 	elif option == 4:
 		run_bot(economy)
 	elif option == 5:
@@ -429,9 +506,10 @@ Run Bot\n5) Manage Citizens\n6) Manage Accounts\n7) Building Cost Calculator\n8)
 	elif option == 7:
 		calc_building_cost(economy)
 	elif option == 8:
-		if raw_input("Are you sure? This will remove posts from the sub.>") in ("y", "Y", "yes", "Yes"):
+		if raw_input("This will remove posts from the subreddit. Are you sure?") in ("y", "Y", "yes", "Yes"):
 			clean_up_sub(economy)
-		
+	elif option == 9:
+		gladiator_menu(economy)
 	pickle.dump(economy, open("economy_save.pickle", "wb"))
 
 if __name__ == "__main__":		
