@@ -1,15 +1,12 @@
 
 def calc_win_percentage(wins, losses):
-	print wins
-	print losses
-	
 	total = float(wins) + losses
 	try:
 		win_percentage = float(wins) / total
 	except ZeroDivisionError:
 		win_percentage = .5
 	if win_percentage == 0:
-		win_percentage = .5
+		win_percentage = .1
 	return win_percentage
 
 class GladiatorFight(object):

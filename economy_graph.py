@@ -180,15 +180,14 @@ def single_commodity_graph(economy, commodity):
 	x_scale = 50
 	while economy.cycle_count * x_scale > SCREENWIDTH:
 		x_scale -= .5
-	max = economy.base_prices[commodity]
-	min = economy.base_prices[commodity]
+	max_y = economy.base_prices[commodity]
+	min_y = economy.base_prices[commodity]
 	for point in economy.price_history[commodity][1:]:
-		if point[1] > max:
+		if point[1] > max_y:
 			max_y = point[1]
-		if point[1] < min:
+		if point[1] < min_y:
 			min_y = point[1]
 	y_scale = SCREENHEIGHT/(((max_y - min_y)/2) + economy.base_prices[commodity])
-	print y_scale
 	
 	surface.fill(Color("black"))
 	pygame.draw.line(surface, Color("white"), (0, SCREENHEIGHT - economy.base_prices[commodity] * y_scale/2),

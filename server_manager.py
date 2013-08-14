@@ -7,9 +7,16 @@ import pyimgur
 import economy_graph
 import fighting
 
+SUBREDDIT = ""
+BOT_NAME = ""
+BOT_PASSWORD = ""
+IMGUR_CLIENT_ID = ""
+MOD_NAME = ""
+MOD_PASSWORD = ""
+
 
 class Economy(object):
-    def __init__(self):
+	def __init__(self):
 		self.base_prices = {"Cactus": .04,
 						"Coal": 2.00,
 						"Cobblestone": .05,
@@ -33,6 +40,7 @@ class Economy(object):
 						"Sandstone": .20,
 						"Sapling": .025,
 						"Wheat": .05,
+						"Wood": .05,
 						"Wheat Seeds": .08,}
 		self.prices = {"Cactus": .04,
 						"Coal": 2.00,
@@ -56,6 +64,7 @@ class Economy(object):
 						"Sand": .05,
 						"Sandstone": .20,
 						"Sapling": .025,
+						"Wood": .05,
 						"Wheat": .05,
 						"Wheat Seeds": .08}
 		
@@ -84,8 +93,8 @@ class Economy(object):
 						"Sandstone": ["peachpuff3"],
 						"Sapling": ["chartreuse3"],
 						"Wheat": ["tan2"],
-						"Wheat Seeds": ["tan4"]}
-						
+						"Wheat Seeds": ["tan4"],
+						"Wood": ["saddlebrown"]}
 		self.volatilities = ["Calm", "Active", "Frantic"]
 		self.volatility_mods = {"Calm": 10,
 								"Active": 20,
@@ -107,8 +116,7 @@ class Economy(object):
 							"Weak": ["Stable", "Weak", "Weak", "Horrendous"],
 							"Horrendous": ["Stable", "Weak", "Weak", "Horrendous"]}
 		self.trend = "Stable"
-		self.cycle_count = 0
-		self.checked_ids = []
+		
 		self.citizens = {"RebuiltOak624": {"QCE Account": 100,
 											"Username": "iminurnamez",
 											"District": "Norhigashi",
@@ -139,8 +147,12 @@ class Economy(object):
 														"Sandstone": 0,
 														"Sapling": 0,
 														"Wheat": 0,
-														"Wheat Seeds": 0}}}
+														"Wheat Seeds": 0,
+														"Wood": 0}}}
 		self.fights = []
+		self.cycle_count = 0
+		self.checked_ids = []
+		
 		
 	def update(self):
 		self.previous_prices = {}
@@ -180,12 +192,8 @@ class Economy(object):
 		self.cycle_count += 1
 
 def post_prices(economy):
-	sub_name = "Quadraria"
-	bot_name = "QuadrarianEconomy"
-	bot_password = ""
-	
-	bot = praw.Reddit(user_agent = bot_name)
-	bot.login(bot_name, bot_password)
+	bot = praw.Reddit(user_agent = BOT_NAME)
+	bot.login(BOT_NAME, BOT_PASSWORD)
 	text = "Economic Condition: {0}".format(economy.trend)
 	text += "\n\nPrice Volatility: {0}".format(economy.volatility)
 	text += "\n\nCommodity|Price|Change\n:---|---:|---:"
@@ -193,13 +201,29 @@ def post_prices(economy):
 		price = "{0:.2f}".format(economy.prices[item]).lstrip("0")
 		text += "\n{0}|{1}|{2:+.4f}".format(item, price, economy.prices[item] - economy.previous_prices[item])
 	text += "\n\nDisplayed prices are rounded to nearest hundredth"
-	bot.submit(sub_name, "QCE Price Update", text)
+	text += "\n\n**Graphs**\n\n"
+	for commodity in economy.prices:
+		economy_graph.single_commodity_graph(economy, commodity)
+		path = os.path.join(commodity + ".png")
+		imgur = pyimgur.Imgur(IMGUR_CLIENT_ID)
+		uploaded_image = imgur.upload_image(path, title=commodity)
+		text += "[{0}]({1}) ".format(commodity, uploaded_image.link)
+		os.remove(os.path.join(commodity + ".png"))
+	bot.submit(SUBREDDIT, "QCE Price Update", text)
 		
 def add_citizen(economy):
 	gamertag = raw_input("Enter gamertag:")
 	username = raw_input("Enter username:")
-	district = raw_input("Enter district:")
-	title = raw_input("Enter title:")
+	
+	district_map = {"1": "Utaratay",
+					"2": "Norhigashi",
+					"3": "Suletela",
+					"4": "Kusinivesta"}
+	print "\n1. Utaratay\n2. Norhigashi\n3. Suletela\n4. Kusinivesta"
+	district = district_map[raw_input("Choose district:")]
+	title_map = {"1": "Citizen","2":"Governor"}
+	print "\n1. Citizen\n2. Governor"
+	title = title_map[raw_input("Choose title:")]
 	economy.citizens[gamertag] = {"QCE Account": 0,
 								"Username": username,
 								"District": district,
@@ -230,14 +254,14 @@ def add_citizen(economy):
 											"Sandstone": 0,
 											"Sapling": 0,
 											"Wheat": 0,
-											"Wheat Seeds": 0}}
-	print "Citizen added"
+											"Wheat Seeds": 0,
+											"Wood": 0}}
+	print "{0} {1} added to {2}".format(title, gamertag, district)
 			
 def remove_citizen(economy):
 	gamertag = raw_input("Enter gamertag:")
 	if gamertag in economy.citizens:
-		double_check = raw_input("Are you sure you want to delete {0}?".format(gamertag))
-		if double_check in ("y", "Y", "yes", "Yes"):
+		if raw_input("Are you sure you want to delete {0}?".format(gamertag)) in ("y", "Y", "yes", "Yes"):
 			del economy.citizens[gamertag]
 			print "{0} has been removed".format(gamertag)
 			
@@ -245,11 +269,36 @@ def change_citizenship(economy):
 	gamertag = raw_input("Enter gamertag:")
 	if gamertag in economy.citizens:
 		new_district = raw_input("Enter new district:")
-		double_check = raw_input("Are you sure you want to change {0}'s district to {1}?".format(gamertag, new_district))
-		if double_check in ("y", "Y", "yes", "Yes"):
+		if raw_input("Are you sure you want to change {0}'s district to {1}?".format(gamertag, new_district)) in ("y", "Y", "yes", "Yes"):
 			economy.citizens[gamertag]["District"] = new_district
 			print "{0} is now a citizen of {1}".format(gamertag, new_district)
-			
+
+def change_reddit_username(economy):
+	gamertag = raw_input("Enter the gamertag:")
+	new_username = raw_input("Enter the new username:")
+	if raw_input("Change {0}'s username from {1} to {2}?".format(gamertag, economy.citizens[gamertag]["Username"],
+				new_username)) in ("Y", "y", "yes", "Yes"):
+		economy.citzens[gamertag]["Username"] = new_username
+		print "{0}'s username is now {1}".format(gamertag, economy.citzens[gamertag]["Username"])
+		
+def change_gamertag(economy):
+	gamertag = raw_input("Enter the gamertag you want to change:")
+	new_gamertag = raw_input("Enter the new gamertag:")
+	if raw_input("Change {0}'s gamertag to {1}?".format(gamertag, new_gamertag)) in ("Y", "y", "yes", "Yes"):
+		economy.citizens[new_gamertag] = {}														
+		for k in economy.citizens[gamertag]:	
+			economy.citizens[new_gamertag][k] = economy.citizens[gamertag][k]
+		del economy.citizens[gamertag]
+		print "{0}'s gamertag has been changed to {1}".format(gamertag, new_gamertag)
+	
+	
+def change_title(economy):
+	gamertag = raw_input("Enter the gamertag whose title you want to change:")
+	new_title = raw_input("Enter {0}'s new title:")
+	if raw_input("Change {0}'s title to {1}?".format(gamertag, new_title)) in ("Y", "y", "yes", "Yes"):
+		economy.citizens[gamertag]["Title"] = new_title
+		print "{0} is now a {1}".format(gamertag, economy.citizens[gamertag]["Title"])
+	
 def economy_handler(economy): 
 	economy.update()
 	post_prices(economy)	
@@ -275,27 +324,33 @@ def trade_handler(economy, author, gamertag, transaction_type, commodity, quanti
 			return "Insufficient Commodity Amount"
 
 def exchange_handler(economy):
-	gamertag = raw_input("\t\tEnter gamertag:")
+	gamertag = raw_input("Enter gamertag:")
 		
 	while True:
-		option = raw_input("\t\tCurrent Account: {0}\n\
+		option = raw_input("\n\nCurrent Account: {0}\n\
 		Choose transaction type:\n\
 		1) Withdrawal\n\
 		2) Deopsit\n\
-		3) Change gamertag\n\
-		4) Display Account\n\
+		3) Buy Items\n\
+		4) Sell Items\n\
+		5) Impose Trade Ban\n\
+		6) Lift Trade Ban\n\
+		7) Different gamertag\n\
+		8) Display Account\n\
 		9) Quit\n\t\t>".format(gamertag))
 		
 		if option == "1":
-			commodity = raw_input("\t\tEnter \"Cash\" or Commodity name to withdraw:\n\t\t>")
-			qty = int(raw_input("\t\tEnter withdrawal amount:"))
-			if commodity == "Cash":
+			commodity = raw_input("\t\tEnter \"cash\" or Commodity name to withdraw:\n\t\t>")
+			
+			if commodity in ["Cash", "cash", "$"]:
+				qty = float(raw_input("\t\tEnter withdrawal amount:"))
 				if economy.citizens[gamertag]["QCE Account"] >= qty:
 					economy.citizens[gamertag]["QCE Account"] -= qty
 					print "\n\t\t${0} withdrawn from {1}'s account\n".format(qty, gamertag)
 				else:
 					print "Insufficient funds"
 			elif commodity in economy.citizens[gamertag]["Inventory"].keys():
+				qty = int(raw_input("\t\tEnter withdrawal amount:"))
 				if economy.citizens[gamertag]["Inventory"][commodity] >= qty:
 					economy.citizens[gamertag]["Inventory"][commodity] -= qty
 					print "\n\t\t{0} {1} withdrawn from {2}'s account\n".format(qty, commodity, gamertag)
@@ -303,19 +358,60 @@ def exchange_handler(economy):
 					print "Insufficient commodity amount"
 		
 		elif option == "2":
-			commodity = raw_input("\t\tEnter \"Cash\" or Commodity name to deposit\n\t\t>")
+			commodity = raw_input("\t\tEnter \"cash\" or Commodity name to deposit\n\t\t>")
 			qty = int(raw_input("\t\tEnter deposit amount:"))
-			if commodity == "Cash":
+			if commodity == "cash":
 				economy.citizens[gamertag]["QCE Account"] += qty
 				print "\n\t\t${0} deposited to {1}'s account\n".format(qty, gamertag)
 			else:
 				economy.citizens[gamertag]["Inventory"][commodity] += qty
 				print "\n\t\t{0} {1} deposited to {2}'s account\n".format(qty, commodity, gamertag)
-			
+		
 		elif option == "3":
+			commodity = raw_input("\t\tEnter Commodity name:")
+			if commodity in economy.prices.keys():
+				qty = int(raw_input("Enter purchase amount:"))
+				if economy.citizens[gamertag]["QCE Account"] >= qty * economy.prices[commodity]:
+					economy.citizens[gamertag]["QCE Account"] -= qty * economy.prices[commodity]
+					economy.citizens[gamertag]["Inventory"][commodity] += qty
+					print "{0} purchased {1} {2} for {3:.2f}".format(gamertag, qty, commodity, qty * economy.prices[commodity])
+				else:
+					print "Insufficient funds"
+			else:
+				print "Invalid commodity"
+				
+		elif option == "4":
+			commodity = raw_input("\t\tEnter Commodity name:")
+			if commodity in economy.citizens[gamertag]["Inventory"].keys():
+				qty = int(raw_input("\t\tEnter sale amount:"))
+				if economy.citizens[gamertag]["Inventory"][commodity] >= qty:
+					economy.citizens[gamertag]["Inventory"][commodity] -= qty
+					total_sale = qty * economy.prices[commodity]
+					economy.citizens[gamertag]["QCE Account"] += total_sale
+					print "\n\t\t{0} {1} sold by {2} for {3:.2f}\n".format(qty, commodity, gamertag, total_sale)
+				else:
+					print "Insufficient commodity amount"
+			else:
+				print "Invalid commodity"
+		
+		elif option == "5":
+			if not economy.citizens[gamertag]["Trade Hold"]:
+				economy.citizens[gamertag]["Trade Hold"] = True
+				print "Trading ban imposed on {0}".format(gamertag)
+			else:
+				print "{0} is already banned from trading".format(gamertag)
+				
+		elif option == "6":
+			if economy.citizens[gamertag]["Trade Hold"]:
+				economy.citizens[gamertag]["Trade Hold"] = False
+				print "{0} is authorized to trade"
+			else:
+				print "{0} is not banned from trading"
+				
+		elif option == "7":
 			gamertag = raw_input("\t\tEnter gamertag:")
 			
-		elif option == "4":
+		elif option == "8":
 			print "\n\n\n\t\tBalance: ${0:.2f}\n".format(economy.citizens[gamertag]["QCE Account"])
 			for commodity in economy.citizens[gamertag]["Inventory"]:
 				print "\t\t{0:20}\t{1:>8}".format(commodity, economy.citizens[gamertag]["Inventory"][commodity])
@@ -338,20 +434,17 @@ def gladiator_menu(economy):
 	print "1. Set up new fight"
 	print "2. Display Gladiator Record"
 	print "3. Resolve fight"
+	print "4. Post fighter records"
 	option = raw_input("\nChoose an option:")
 	
-	if option == "1":
-		sub_name = "Quadraria"
-		bot_name = "QuadrarianEconomy"
-		bot_password = ""
-				
+	if option == "1":		
 		gladiator1 = raw_input("Enter the first gladiator's gamertag:")
 		gladiator2 = raw_input("Enter the second gladiator's gamertag:")
 		if economy.citizens[gladiator1]["District"] == economy.citizens[gladiator2]["District"]:
 			print "Gladiators are from the same district"
 		else:
-			bot = praw.Reddit(user_agent = bot_name)
-			bot.login(bot_name, bot_password)
+			bot = praw.Reddit(user_agent = BOT_NAME)
+			bot.login(BOT_NAME, BOT_PASSWORD)
 			fight = fighting.GladiatorFight(economy, gladiator1, gladiator2)
 			economy.fights.append(fight)
 			text = "{0} ".format(fight.marquee)
@@ -374,16 +467,22 @@ def gladiator_menu(economy):
 			i += 1
 		fight_num = int(raw_input("Choose fight to resolve:"))
 		fight_map[fight_num].resolve_fight(economy)
+	
+	elif option == "4":
+		bot = praw.Reddit(user_agent = BOT_NAME)
+		bot.login(BOT_NAME, BOT_PASSWORD)
+		
+		text = "Gladiator|W-L|District\n:---|:---:|:---"
+		for citizen in economy.citizens:
+			text += "\n{0}|{1}-{2}|{3}".format(citizen, economy.citizens[citizen]["Gladiator Wins"],
+					economy.citizens[citizen]["Gladiator Losses"], economy.citizens[citizen]["District"])
+		
+		bot.submit(sub_name, "Gladiator Records", text)
 		
 def run_bot(economy):
-	sub_name = "Quadraria"
-	bot_name = "QuadrarianEconomy"
-	bot_password = "" 
-	imgur_client_id = ""
-	
-	bot = praw.Reddit(user_agent = bot_name)
-	bot.login(bot_name, bot_password)
-	submissions = bot.get_subreddit(sub_name).get_new()
+	bot = praw.Reddit(user_agent = BOT_NAME)
+	bot.login(BOT_NAME, BOT_PASSWORD)
+	submissions = bot.get_subreddit(SUBREDDIT).get_new()
 	for submission in submissions:
 		if submission.id not in economy.checked_ids and "#" in submission.title:
 			title = submission.title
@@ -423,7 +522,7 @@ def run_bot(economy):
 						else:
 							economy_graph.single_commodity_graph(economy, commodity)
 							path = os.path.join(commodity + ".png")
-							imgur = pyimgur.Imgur(imgur_client_id)
+							imgur = pyimgur.Imgur(IMGUR_CLIENT_ID)
 							uploaded_image = imgur.upload_image(path, title=commodity)
 							print(uploaded_image.link)
 							reply += "[Graph]({0})".format(uploaded_image.link)
@@ -456,13 +555,9 @@ def run_bot(economy):
 			if len(reply) > 1:
 				submission.add_comment(reply)
 
-def clean_up_sub(economy):
-	sub_name = "Quadraria"
-	mod_name = "iminurnamez"
-	mod_password = ""
-	
-	bot = praw.Reddit(user_agent = sub_name + "Mod")
-	bot.login(mod_name, mod_password)
+def clean_up_sub(economy):	
+	bot = praw.Reddit(user_agent = SUBREDDIT + "Mod")
+	bot.login(MOD_NAME, MOD_PASSWORD)
 	submissions = bot.get_subreddit(sub_name).get_new()
 	for submission in submissions:
 		if submission.id in economy.checked_ids:
@@ -484,33 +579,47 @@ def main():
 	except IOError:
 		print "Couldn't load economy_save.pickle"
 		economy = Economy()
-	
-	option = int(raw_input("\n\n\n1) Update Economy\n\n2) Draw Graph\n\n3) Single Commodity Graph\n\n4) \
-Run Bot\n\n5) Manage Citizens\n\n6) Manage Accounts\n\n7) Building Cost Calculator\n\n8) Clean Up Sub\n\n9) Gladiator options\n\nEnter option number:"))
+		for i in range(50):		# seeds the price history for graphs
+			economy.update()
+	option = int(raw_input("\n\n\n1) Update Economy\n\n2) Run Bot\n\n3) Citizens Menu\n\n4) \
+Manage Accounts\n\n5) Gladiators Menu\n\n6) Building Cost Calculator\n\n7) Interactive Graph\n\n8) Single Commodity Graph\n\n9) Clean Up Subreddit\n\nEnter option number:"))
 	if option == 1:
 		economy_handler(economy)
 	elif option == 2:
-		economy_graph.show_graph(economy)
-	elif option == 3:
-		commodity = raw_input("Enter commodity name:")
-		economy_graph.single_commodity_graph(economy, commodity)
-	elif option == 4:
 		run_bot(economy)
-	elif option == 5:
-		citizen_option = raw_input("\n\t\tChoose an option\n\t\t1) Add citizen\n\t\t2) Remove citizen\n\t\t")
+	elif option == 3:
+		citizen_option = raw_input("\n\nChoose an option\n\n1) Add citizen\n\n2) Change district\n\
+						\n3) Change title\n\n4) Change reddit username\n\n5) Change gamertag\n\n6) Remove citizen\n\n")
 		if citizen_option == "1":
 			add_citizen(economy)
 		elif citizen_option == "2":
+			change_citizenship(economy)
+		elif citizen_option == "3":
+			change_title(economy)
+		elif citizen_option == "4":
+			change_reddit_username(economy)
+		elif citizen_option == "5":
+			change_gamertag(economy)
+		elif citizen_option == "6":
 			remove_citizen(economy)
-	elif option == 6:
+	elif option == 4:
 		exchange_handler(economy)
-	elif option == 7:
+	elif option == 5:
+		gladiator_menu(economy)
+	elif option == 6:
 		calc_building_cost(economy)
+	elif option == 7:
+		economy_graph.show_graph(economy)
 	elif option == 8:
+		commodity = raw_input("Enter commodity name:")
+		economy_graph.single_commodity_graph(economy, commodity)
+	elif option == 9:
 		if raw_input("This will remove posts from the subreddit. Are you sure?") in ("y", "Y", "yes", "Yes"):
 			clean_up_sub(economy)
-	elif option == 9:
-		gladiator_menu(economy)
+	elif option == 13:
+		with open("citizen_list.txt", "a") as out:
+			for citizen in economy.citizens:
+				out.write("\n{0}: {1}".format(citizen, economy.citizens[citizen]["Username"]))
 	pickle.dump(economy, open("economy_save.pickle", "wb"))
 
 if __name__ == "__main__":		
