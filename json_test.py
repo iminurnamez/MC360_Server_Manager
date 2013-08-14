@@ -36,7 +36,7 @@ class Economy(object):
                                                         "Wood": 0}}}
                                                         
 example_economy = Economy()		
-
+example_economy.citizens["RebuiltOak624"]["QCE Account"] = 0
 class MyEncoder(json.JSONEncoder):
     def default(self, obj):
         if not isinstance(obj, Economy):
