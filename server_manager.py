@@ -138,27 +138,27 @@ class Economy(object):
         for item in self.prices:
             if random.randint(1, 100) < self.volatility_mods[self.volatility]:
                 x = 50
-            if self.prices[item] > self.base_prices[item] * 3:
-                x = 10
-            elif self.prices[item] > self.base_prices[item] * 2:
-                x = 15
-            elif self.prices[item] > self.base_prices[item] * 1.5:
-                x = 25
-            elif self.prices[item] > self.base_prices[item] * 1.25:
-                x = 40
-            elif self.prices[item] < self.base_prices[item] * .8:
-                x = 60
-            elif self.prices[item] < self.base_prices[item] * .6:
-                x = 75
-            elif self.prices[item] < self.base_prices[item] * .4:
-                x = 85
-            elif self.prices[item] < self.base_prices[item] * .3:
-                x = 90
-            x += self.trend_mods[self.trend]
-            if random.randint(1, 100) < x:
-                self.prices[item] += self.prices[item] * random.uniform(0.0, 0.2)
-            else:
-                self.prices[item] -= self.prices[item] * random.uniform(0.0, 0.2)
+                if self.prices[item] > self.base_prices[item] * 3:
+                    x = 10
+                elif self.prices[item] > self.base_prices[item] * 2:
+                    x = 15
+                elif self.prices[item] > self.base_prices[item] * 1.5:
+                    x = 25
+                elif self.prices[item] > self.base_prices[item] * 1.25:
+                    x = 40
+                elif self.prices[item] < self.base_prices[item] * .8:
+                    x = 60
+                elif self.prices[item] < self.base_prices[item] * .6:
+                    x = 75
+                elif self.prices[item] < self.base_prices[item] * .4:
+                    x = 85
+                elif self.prices[item] < self.base_prices[item] * .3:
+                    x = 90
+                x += self.trend_mods[self.trend]
+                if random.randint(1, 100) < x:
+                    self.prices[item] += self.prices[item] * random.uniform(0.0, 0.2)
+                else:
+                    self.prices[item] -= self.prices[item] * random.uniform(0.0, 0.2)
         for item in self.prices:
             self.price_history[item].append((self.cycle_count, self.prices[item]))
         self.cycle_count += 1
